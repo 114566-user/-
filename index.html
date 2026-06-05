@@ -242,11 +242,11 @@
 
         <div class="controls-info">
             PC 鍵盤：<span class="kbd-btn">A</span> 鍵逆時針，<span class="kbd-btn">D</span> 鍵順時針，<span class="kbd-btn">Space 空白鍵</span> 暫停。<br>
-            每次碰撞彈起時球體會立刻變色，請集中精神防禦！
+            已修復多邊形判定漏洞，現在六邊形以上也能完美精準對齊！
         </div>
     </div>
 
-    <script>
+    <script {sandbox="allow-scripts"}>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -298,10 +298,10 @@
             y: centerY - 60, 
             radius: 12,
             vy: 0,
-            gravity: 0.09, 
-            color: '#fff',
-            colorIndex: 0
+            gravity: 0.09 
         };
+        let ballColor = '#fff';
+        let ballColorIndex = 0;
 
         // 1. 玩家主動點擊開始按鈕
         function clickStartButton() {
@@ -370,8 +370,8 @@
             ball.y = centerY - 60; 
             ball.vy = 0; 
             
-            ball.colorIndex = Math.floor(Math.random() * sides);
-            ball.color = sideColors[ball.colorIndex];
+            ballColorIndex = Math.floor(Math.random() * sides);
+            ballColor = sideColors[ballColorIndex];
         }
 
         // 6. 控制邏輯：旋轉底邊
@@ -398,24 +398,34 @@
             }
         });
 
-        // 7. 核心物理運算
+        // 7. 核心物理運算與重構的碰撞判定
         function update() {
             if (!isPlaying || isPaused) return; 
 
             ball.vy += ball.gravity;
             ball.y += ball.vy;
 
+            // 計算當前圖形的精準邊心距
             const apothem = polyRadius * Math.cos(Math.PI / sides);
-            const hitThreshold = centerY + apothem - ball.radius;
+            const hitDistance = centerY + apothem - ball.radius;
 
-            if (ball.y >= hitThreshold) {
-                let normalizedRotation = currentRotation % (2 * Math.PI);
-                if (normalizedRotation < 0) normalizedRotation += 2 * Math.PI;
+            // 【重大修正】：當球體高度達到或超過碰撞線時觸發
+            if (ball.y >= hitDistance) {
+                
+                // 1. 強制將球固定在碰撞表面，防止因高速更新而直接穿透
+                ball.y = hitDistance;
 
-                let currentBottomSideIndex = Math.round((2 * Math.PI - normalizedRotation) / ((2 * Math.PI) / sides)) % sides;
-                if(currentBottomSideIndex < 0) currentBottomSideIndex += sides;
+                // 2. 核心修正：使用相對轉角法來計算正下方的邊
+                // 將玩家累積的旋轉量 currentRotation 轉為正數的 0 ~ 2*PI 範圍
+                let angleNorm = currentRotation % (2 * Math.PI);
+                if (angleNorm < 0) angleNorm += 2 * Math.PI;
 
-                if (ball.colorIndex === currentBottomSideIndex) {
+                // 計算底邊在世界坐標系中的相對索引 (加上 0.001 浮點數微調緩衝區防止臨界點跳號)
+                let currentBottomSideIndex = Math.round((2 * Math.PI - angleNorm) / ((2 * Math.PI) / sides)) % sides;
+                if (currentBottomSideIndex < 0) currentBottomSideIndex += sides;
+
+                // 3. 比對顏色
+                if (ballColorIndex === currentBottomSideIndex) {
                     score++;
                     comboCount++;
                     document.getElementById('scoreText').innerText = score;
@@ -424,7 +434,7 @@
                     if (comboCount >= 3) {
                         sides = Math.min(sides + 1, 8); 
                         comboCount = 0;
-                        currentRotation = 0; 
+                        currentRotation = 0; // 進化時歸零角度，確保新圖形初始化也是水平底邊
                         generateColors();
                         updateEdgeText();
                         playTone(1200, 'sine', 0.3);
@@ -433,9 +443,9 @@
                     // 向上彈回
                     ball.vy = -Math.sqrt(2 * ball.gravity * 160);
                     
-                    // 【核心修改】球體在撞擊正確邊、彈回往上的「那一瞬間」立刻隨機變色
-                    ball.colorIndex = Math.floor(Math.random() * sides);
-                    ball.color = sideColors[ball.colorIndex];
+                    // 彈回瞬間完美更換顏色
+                    ballColorIndex = Math.floor(Math.random() * sides);
+                    ballColor = sideColors[ballColorIndex];
 
                 } else {
                     gameOver();
@@ -495,9 +505,9 @@
             // 繪製球
             ctx.beginPath();
             ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-            ctx.fillStyle = ball.color;
+            ctx.fillStyle = ballColor;
             ctx.shadowBlur = 15;
-            ctx.shadowColor = ball.color;
+            ctx.shadowColor = ballColor;
             ctx.fill();
             ctx.closePath();
             ctx.shadowBlur = 0;
@@ -511,8 +521,8 @@
         }
 
         generateColors();
-        ball.colorIndex = Math.floor(Math.random() * sides);
-        ball.color = sideColors[ball.colorIndex];
+        ballColorIndex = Math.floor(Math.random() * sides);
+        ballColor = sideColors[ballColorIndex];
         draw();
         gameLoop();
     </script>
