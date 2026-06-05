@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幾何色彩共振 (Geometry Color Reflex)</title>
+    <style>
+        :root {
+            --bg-dark: #0f0f1a;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --gold: #ffd700;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 頂部資訊欄 */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            width: 500px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            background: var(--panel-bg);
+            padding: 10px 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .hud span {
+            color: var(--gold);
+        }
+
+        /* 遊戲主畫布 */
+        canvas {
+            background: radial-gradient(circle, #1a1a3a 0%, #080811 100%);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7), 0 0 15px rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+
+        /* 操作指示 */
+        .controls-info {
+            margin-top: 15px;
+            color: #aaa;
+            font-size: 0.9rem;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .kbd-btn {
+            background: #333;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            font-weight: bold;
+        }
+
+        /* 控制與主按鈕區 */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .menu-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            min-height: 55px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 40px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #2c2c54, #474787);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #474787;
+        }
+
+        /* 主要控制遊戲開始的按鈕 */
+        .btn-main-start {
+            background: linear-gradient(135deg, #10ac84, #1dd1a1);
+            color: white;
+            border: none;
+            padding: 14px 60px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(29, 209, 161, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn-main-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(29, 209, 161, 0.6);
+        }
+
+        /* 暫停按鈕樣式 */
+        .btn-pause {
+            background: linear-gradient(135deg, #57606f, #2f3542);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .btn-pause:hover {
+            background: linear-gradient(135deg, #747d8c, #57606f);
+        }
+
+        /* 覆蓋式的結算與暫停畫面 */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 20, 0.9);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .overlay h2 {
+            font-size: 2.5rem;
+            color: var(--gold);
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(255,215,0,0.4);
+        }
+
+        .overlay p {
+            font-size: 1.2rem;
+            color: #ddd;
+            margin-bottom: 25px;
+        }
+
+        .btn-restart {
+            background: linear-gradient(135deg, #ff5252, #ff793f);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 82, 82, 0.4);
+            transition: transform 0.2s;
+        }
+
+        .btn-restart:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="hud">
+            <div>分數：<span id="scoreText">0</span></div>
+            <div>目前幾何：<span id="edgeText">正三角形</span></div>
+        </div>
+
+        <div style="position: relative;">
+            <canvas id="gameCanvas" width="500" height="500"></canvas>
+            
+            <div id="gameOverlay" class="overlay hidden">
+                <h2 id="overlayTitle">遊戲結束 ❌</h2>
+                <p id="overlaySub">最終得分：0 分</p>
+                <button class="btn-restart" id="overlayBtn" onclick="clickStartButton()">再試一次</button>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="menu-buttons">
+                <button class="btn-main-start" id="mainStartBtn" onclick="clickStartButton()">▶ 點我開始遊戲</button>
+                <button class="btn-pause" id="pauseBtn" onclick="togglePause()">⏸ 暫停遊戲</button>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn" onclick="rotateLeft()">◀ 逆時針 (A)</button>
+                <button class="btn" onclick="rotateRight()">順時針 (D) ▶</button>
+            </div>
+        </div>
+
+        <div class="controls-info">
+            PC 鍵盤：<span class="kbd-btn">A</span> 鍵逆時針，<span class="kbd-btn">D</span> 鍵順時針，<span class="kbd-btn">Space 空白鍵</span> 暫停。<br>
+            每次碰撞彈起時球體會立刻變色，請集中精神防禦！
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 音效設定
+        let audioCtx;
+        function playTone(freq, type, duration) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = createGainNode();
+            if (!gain) return;
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+        function createGainNode() {
+            try {
+                const gain = audioCtx.createGain();
+                gain.connect(audioCtx.destination);
+                return gain;
+            } catch(e) { return null; }
+        }
+
+        // 遊戲變數
+        let score = 0;
+        let comboCount = 0; 
+        let sides = 3;      
+        let isPlaying = false;  
+        let isPaused = false;   
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const polyRadius = 180; 
+
+        let currentRotation = 0; 
+
+        const colorPalette = [
+            '#ff5252', '#33d9b2', '#ffda79', '#34ace0', 
+            '#ff793f', '#706fd3', '#b33939', '#ffb8b8'
+        ];
+        let sideColors = [];
+
+        // 球的物理性質
+        let ball = {
+            x: centerX,
+            y: centerY - 60, 
+            radius: 12,
+            vy: 0,
+            gravity: 0.09, 
+            color: '#fff',
+            colorIndex: 0
+        };
+
+        // 1. 玩家主動點擊開始按鈕
+        function clickStartButton() {
+            score = 0;
+            comboCount = 0;
+            sides = 3;
+            currentRotation = 0; 
+            isPaused = false;
+            
+            document.getElementById('scoreText').innerText = score;
+            document.getElementById('gameOverlay').classList.add('hidden');
+            document.getElementById('mainStartBtn').style.display = 'none'; 
+            document.getElementById('pauseBtn').style.display = 'block';    
+            document.getElementById('pauseBtn').innerText = "⏸ 暫停遊戲";
+
+            generateColors();
+            resetBall();
+            updateEdgeText();
+            
+            isPlaying = true; 
+            playTone(440, 'sine', 0.3);
+        }
+
+        // 2. 暫停與繼續功能
+        function togglePause() {
+            if (!isPlaying) return; 
+
+            isPaused = !isPaused;
+            const overlay = document.getElementById('gameOverlay');
+            const overlayTitle = document.getElementById('overlayTitle');
+            const overlaySub = document.getElementById('overlaySub');
+            const overlayBtn = document.getElementById('overlayBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+
+            if (isPaused) {
+                overlayTitle.innerText = "遊戲暫停 ⏸";
+                overlaySub.innerText = "歇一會，準備好隨時重返戰場！";
+                overlayBtn.innerText = "繼續遊戲";
+                overlayBtn.onclick = togglePause; 
+                pauseBtn.innerText = "▶ 繼續遊戲";
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+                pauseBtn.innerText = "⏸ 暫停遊戲";
+                overlayBtn.onclick = clickStartButton; 
+            }
+        }
+
+        // 3. 生成顏色
+        function generateColors() {
+            sideColors = [];
+            for (let i = 0; i < sides; i++) {
+                sideColors.push(colorPalette[i % colorPalette.length]);
+            }
+        }
+
+        // 4. 更新 HUD 幾何名稱
+        function updateEdgeText() {
+            const names = {3: '正三角形', 4: '正方形', 5: '正五邊形', 6: '正六邊形', 7: '正七邊形', 8: '正八邊形'};
+            document.getElementById('edgeText').innerText = names[sides] || `正 ${sides} 邊形`;
+        }
+
+        // 5. 重置球的位置與顏色
+        function resetBall() {
+            ball.x = centerX;
+            ball.y = centerY - 60; 
+            ball.vy = 0; 
+            
+            ball.colorIndex = Math.floor(Math.random() * sides);
+            ball.color = sideColors[ball.colorIndex];
+        }
+
+        // 6. 控制邏輯：旋轉底邊
+        function rotateLeft() {
+            if (!isPlaying || isPaused) return;
+            const angleStep = (2 * Math.PI) / sides;
+            currentRotation -= angleStep;
+            playTone(600, 'triangle', 0.05);
+        }
+
+        function rotateRight() {
+            if (!isPlaying || isPaused) return;
+            const angleStep = (2 * Math.PI) / sides;
+            currentRotation += angleStep;
+            playTone(600, 'triangle', 0.05);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') rotateLeft();
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') rotateRight();
+            if (e.key === ' ') {
+                e.preventDefault(); 
+                togglePause();
+            }
+        });
+
+        // 7. 核心物理運算
+        function update() {
+            if (!isPlaying || isPaused) return; 
+
+            ball.vy += ball.gravity;
+            ball.y += ball.vy;
+
+            const apothem = polyRadius * Math.cos(Math.PI / sides);
+            const hitThreshold = centerY + apothem - ball.radius;
+
+            if (ball.y >= hitThreshold) {
+                let normalizedRotation = currentRotation % (2 * Math.PI);
+                if (normalizedRotation < 0) normalizedRotation += 2 * Math.PI;
+
+                let currentBottomSideIndex = Math.round((2 * Math.PI - normalizedRotation) / ((2 * Math.PI) / sides)) % sides;
+                if(currentBottomSideIndex < 0) currentBottomSideIndex += sides;
+
+                if (ball.colorIndex === currentBottomSideIndex) {
+                    score++;
+                    comboCount++;
+                    document.getElementById('scoreText').innerText = score;
+                    playTone(880, 'sine', 0.15);
+
+                    if (comboCount >= 3) {
+                        sides = Math.min(sides + 1, 8); 
+                        comboCount = 0;
+                        currentRotation = 0; 
+                        generateColors();
+                        updateEdgeText();
+                        playTone(1200, 'sine', 0.3);
+                    }
+
+                    // 向上彈回
+                    ball.vy = -Math.sqrt(2 * ball.gravity * 160);
+                    
+                    // 【核心修改】球體在撞擊正確邊、彈回往上的「那一瞬間」立刻隨機變色
+                    ball.colorIndex = Math.floor(Math.random() * sides);
+                    ball.color = sideColors[ball.colorIndex];
+
+                } else {
+                    gameOver();
+                }
+            }
+        }
+
+        // 8. 遊戲結束
+        function gameOver() {
+            isPlaying = false;
+            playTone(150, 'sawtooth', 0.6);
+            
+            document.getElementById('overlayTitle').innerText = "遊戲結束 ❌";
+            document.getElementById('overlaySub').innerHTML = `最終得分：<strong style="color:var(--gold); font-size:1.8rem;">${score}</strong> 分`;
+            document.getElementById('overlayBtn').innerText = "再試一次";
+            document.getElementById('overlayBtn').onclick = clickStartButton;
+            document.getElementById('gameOverlay').classList.remove('hidden');
+            
+            document.getElementById('mainStartBtn').style.display = 'block'; 
+            document.getElementById('pauseBtn').style.display = 'none';      
+        }
+
+        // 9. 繪製渲染
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentRotation); 
+
+            const angleStep = (2 * Math.PI) / sides;
+            const initialOffset = Math.PI / 2;
+
+            for (let i = 0; i < sides; i++) {
+                const startAngle = i * angleStep + initialOffset - angleStep / 2;
+                const endAngle = (i + 1) * angleStep + initialOffset - angleStep / 2;
+
+                const x1 = polyRadius * Math.cos(startAngle);
+                const y1 = polyRadius * Math.sin(startAngle);
+                const x2 = polyRadius * Math.cos(endAngle);
+                const y2 = polyRadius * Math.sin(endAngle);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = sideColors[i] || '#fff';
+                ctx.lineCap = 'round';
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = sideColors[i];
+                ctx.stroke();
+            }
+            ctx.restore();
+            ctx.shadowBlur = 0;
+
+            // 繪製球
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = ball.color;
+            ctx.fill();
+            ctx.closePath();
+            ctx.shadowBlur = 0;
+        }
+
+        // 10. 主循環
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        generateColors();
+        ball.colorIndex = Math.floor(Math.random() * sides);
+        ball.color = sideColors[ball.colorIndex];
+        draw();
+        gameLoop();
+    </script>
+</body>
+</html>
